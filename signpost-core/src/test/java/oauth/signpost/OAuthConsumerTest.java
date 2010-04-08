@@ -200,7 +200,7 @@ public abstract class OAuthConsumerTest extends SignpostTestBase {
         in.reset();
         when(httpPostMock.getContentType()).thenReturn("");
         consumer.sign(httpPostMock);
-        assertEquals("Lve95gjOVATpfV8EL5X4nxwjKHE=", consumer.getRequestParameters().getFirst(
+        assertEquals("Lve95gjOVATpfV8EL5X4nxwjKHE%3D", consumer.getRequestParameters().getFirst(
                 OAuth.OAUTH_BODY_HASH));
     }
     
