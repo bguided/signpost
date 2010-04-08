@@ -188,4 +188,6 @@ public interface OAuthConsumer extends Serializable {
      * @return the request parameters used for message signing
      */
     public HttpParameters getRequestParameters();
+    
+    public void setShouldSignBody(boolean enabled);
 }

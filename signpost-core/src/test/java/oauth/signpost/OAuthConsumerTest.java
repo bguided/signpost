@@ -1,7 +1,9 @@
+
 package oauth.signpost;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Matchers.argThat;
 import static org.mockito.Matchers.eq;
@@ -10,8 +12,12 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 
@@ -24,6 +30,8 @@ import oauth.signpost.signature.OAuthMessageSigner;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.ArgumentMatcher;
+import org.mockito.Matchers;
+import org.mockito.Mock;
 import org.mockito.runners.MockitoJUnit44Runner;
 
 @RunWith(MockitoJUnit44Runner.class)
@@ -58,7 +66,7 @@ public abstract class OAuthConsumerTest extends SignpostTestBase {
         consumer.sign(httpGetMock);
 
         verify(httpGetMock).setHeader(eq("Authorization"),
-            argThat(new IsCompleteListOfOAuthParameters()));
+                argThat(new IsCompleteListOfOAuthParameters()));
     }
 
     @Test
@@ -90,10 +98,11 @@ public abstract class OAuthConsumerTest extends SignpostTestBase {
         ByteArrayInputStream body = new ByteArrayInputStream("b=2".getBytes());
         when(request.getMessagePayload()).thenReturn(body);
         when(request.getContentType()).thenReturn(
-            "application/x-www-form-urlencoded; charset=ISO-8859-1");
+                "application/x-www-form-urlencoded; charset=ISO-8859-1");
         when(request.getHeader("Authorization")).thenReturn(
-            "OAuth realm=www.example.com, oauth_signature=12345, oauth_version=1.1");
+                "OAuth realm=www.example.com, oauth_signature=12345, oauth_version=1.1");
 
+        when(request.getMethod()).thenReturn("GET");
         OAuthMessageSigner signer = mock(HmacSha1MessageSigner.class);
         consumer.setMessageSigner(signer);
 
@@ -103,7 +112,7 @@ public abstract class OAuthConsumerTest extends SignpostTestBase {
         // message signer
         ArgumentMatcher<HttpParameters> hasAllParameters = new ArgumentMatcher<HttpParameters>() {
             public boolean matches(Object argument) {
-                HttpParameters params = (HttpParameters) argument;
+                HttpParameters params = (HttpParameters)argument;
                 assertEquals("1", params.get("a").first());
                 assertEquals("2", params.get("b").first());
                 assertEquals("1.1", params.get("oauth_version").first());
@@ -120,6 +129,7 @@ public abstract class OAuthConsumerTest extends SignpostTestBase {
         // mock a request that has custom query, body, and header params set
         HttpRequest request = mock(HttpRequest.class);
         when(request.getRequestUrl()).thenReturn("http://example.com?a=1");
+        when(request.getMethod()).thenReturn("GET");
 
         OAuthMessageSigner signer = mock(HmacSha1MessageSigner.class);
         consumer.setMessageSigner(signer);
@@ -134,7 +144,7 @@ public abstract class OAuthConsumerTest extends SignpostTestBase {
         // message signer
         ArgumentMatcher<HttpParameters> hasParameters = new ArgumentMatcher<HttpParameters>() {
             public boolean matches(Object argument) {
-                HttpParameters params = (HttpParameters) argument;
+                HttpParameters params = (HttpParameters)argument;
                 assertEquals("oob", params.getFirst("oauth_callback"));
                 assertEquals("1", params.getFirst("a"));
                 return true;
@@ -163,9 +173,9 @@ public abstract class OAuthConsumerTest extends SignpostTestBase {
         ObjectOutputStream ostream = new ObjectOutputStream(baos);
         ostream.writeObject(consumer);
 
-        ObjectInputStream istream = new ObjectInputStream(new ByteArrayInputStream(
-                baos.toByteArray()));
-        consumer = (OAuthConsumer) istream.readObject();
+        ObjectInputStream istream = new ObjectInputStream(new ByteArrayInputStream(baos
+                .toByteArray()));
+        consumer = (OAuthConsumer)istream.readObject();
 
         assertEquals(CONSUMER_KEY, consumer.getConsumerKey());
         assertEquals(CONSUMER_SECRET, consumer.getConsumerSecret());
@@ -174,6 +184,49 @@ public abstract class OAuthConsumerTest extends SignpostTestBase {
 
         // signing messages should still work
         consumer.sign(httpGetMock);
+    }
+
+    @Test
+    public void shouldAddBodyHashToPost() throws Exception {
+        OAuthConsumer consumer = buildConsumer(CONSUMER_KEY, CONSUMER_SECRET, null);
+        consumer.setShouldSignBody(true);
+        InputStream in = new ByteArrayInputStream("Hello World!".getBytes());
+        when(httpPostMock.getMessagePayload()).thenReturn(in);
+
+        when(httpPostMock.getContentType()).thenReturn(OAuth.FORM_ENCODED);
+        consumer.sign(httpPostMock);
+        assertNull(consumer.getRequestParameters().getFirst(OAuth.OAUTH_BODY_HASH));
+
+        in.reset();
+        when(httpPostMock.getContentType()).thenReturn("");
+        consumer.sign(httpPostMock);
+        assertEquals("Lve95gjOVATpfV8EL5X4nxwjKHE=", consumer.getRequestParameters().getFirst(
+                OAuth.OAUTH_BODY_HASH));
+    }
+    
+    @Test
+    public void shouldNotAddBodyHashToGet() throws Exception {
+        OAuthConsumer consumer = buildConsumer(CONSUMER_KEY, CONSUMER_SECRET, null);
+        consumer.setShouldSignBody(true);
+        consumer.sign(httpGetMock);
+        assertNull(consumer.getRequestParameters().getFirst(OAuth.OAUTH_BODY_HASH));
+    }
+    
+    @Test
+    public void shouldReturnCorrectBodyHashAndSignature() throws Exception {
+        OAuthConsumer consumer = buildConsumer(CONSUMER_KEY, CONSUMER_SECRET, null);
+        consumer.setShouldSignBody(true);
+        consumer.sign(httpPutMock);
+        verify(httpPutMock).setHeader(eq("Authorization"), argThat(new ArgumentMatcher<String>() {
+            @Override
+            public boolean matches(Object argument) {
+                String oauthHeader = (String)argument;
+                assertTrue(oauthHeader.startsWith("OAuth "));
+                assertTrue(oauthHeader.contains(OAuth.OAUTH_BODY_HASH));
+                return true;
+            }
+        }));
+
     }
 
     // @Test
@@ -194,7 +247,7 @@ public abstract class OAuthConsumerTest extends SignpostTestBase {
 
         @Override
         public boolean matches(Object argument) {
-            String oauthHeader = (String) argument;
+            String oauthHeader = (String)argument;
             assertTrue(oauthHeader.startsWith("OAuth "));
             assertAllOAuthParametersExist(OAuth.oauthHeaderToParamsMap(oauthHeader));
             return true;
@@ -215,7 +268,7 @@ public abstract class OAuthConsumerTest extends SignpostTestBase {
 
         @Override
         public boolean matches(Object argument) {
-            String oauthHeader = (String) argument;
+            String oauthHeader = (String)argument;
             HttpParameters params = OAuth.oauthHeaderToParamsMap(oauthHeader);
             assertEquals("\"1%252\"", params.getFirst("oauth_consumer_key"));
             assertEquals("\"3%204\"", params.getFirst("oauth_token"));

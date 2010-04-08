@@ -34,6 +34,10 @@ public class AuthorizationHeaderSigningStrategy implements SigningStrategy {
             sb.append(requestParameters.getAsHeaderElement(OAuth.OAUTH_VERIFIER));
             sb.append(", ");
         }
+        if (requestParameters.containsKey(OAuth.OAUTH_BODY_HASH)) {
+            sb.append(requestParameters.getAsHeaderElement(OAuth.OAUTH_BODY_HASH));
+            sb.append(", ");
+        }
         sb.append(requestParameters.getAsHeaderElement(OAuth.OAUTH_CONSUMER_KEY));
         sb.append(", ");
         sb.append(requestParameters.getAsHeaderElement(OAuth.OAUTH_VERSION));

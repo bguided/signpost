@@ -37,6 +37,10 @@ public class QueryStringSigningStrategy implements SigningStrategy {
             sb.append("&");
             sb.append(requestParameters.getAsQueryString(OAuth.OAUTH_VERIFIER));
         }
+        if (requestParameters.containsKey(OAuth.OAUTH_BODY_HASH)) {
+            sb.append("&");
+            sb.append(requestParameters.getAsHeaderElement(OAuth.OAUTH_BODY_HASH));
+        }
 
         // add the remaining OAuth params
         sb.append("&");

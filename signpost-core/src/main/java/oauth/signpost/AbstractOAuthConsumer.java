@@ -14,9 +14,16 @@
  */
 package oauth.signpost;
 
+import java.io.BufferedInputStream;
+import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.util.Random;
+import java.util.SortedSet;
+
+import org.apache.commons.codec.binary.Base64;
+import org.apache.commons.codec.digest.DigestUtils;
 
 import oauth.signpost.basic.UrlStringRequestAdapter;
 import oauth.signpost.exception.OAuthCommunicationException;
@@ -56,6 +63,8 @@ public abstract class AbstractOAuthConsumer implements OAuthConsumer {
     private HttpParameters requestParameters;
 
     private boolean sendEmptyTokens;
+    
+    private boolean shouldSignBody = false;
 
     public AbstractOAuthConsumer(String consumerKey, String consumerSecret) {
         this.consumerKey = consumerKey;
@@ -94,6 +103,10 @@ public abstract class AbstractOAuthConsumer implements OAuthConsumer {
             collectHeaderParameters(request, requestParameters);
             collectQueryParameters(request, requestParameters);
             collectBodyParameters(request, requestParameters);
+            
+            if (shouldSignBody) {
+                collectBodyHashParameters(request, requestParameters);
+            }
 
             // add any OAuth params that haven't already been set
             completeOAuthParameters(requestParameters);
@@ -250,6 +263,28 @@ public abstract class AbstractOAuthConsumer implements OAuthConsumer {
             out.putAll(OAuth.decodeForm(url.substring(q + 1)), true);
         }
     }
+    
+    protected void collectBodyHashParameters(HttpRequest request, HttpParameters out) 
+        throws IOException{
+        // The body hash parameter MUST NOT be sent on requests that use the application/x-www-form-urlencoded content-type. 
+        // The body hash parameter MUST NOT be sent on HTTP GET or HEAD requests. 
+        // The body hash parameter SHOULD be sent on all other requests.
+        String method = request.getMethod();
+        String contentType = request.getContentType();
+        if (method.equals("GET") || method.equals("HEAD") || contentType.startsWith(OAuth.FORM_ENCODED)) {
+            // do nothing
+        } else {
+            // add bodyhash
+            out.put(OAuth.OAUTH_BODY_HASH, getHashForBody(request.getMessagePayload()));
+        }
+    }
+
+    private String getHashForBody(InputStream messagePayload) throws IOException {
+        Base64 b64 = new Base64();
+        String payload = convertStreamToString(messagePayload);
+        byte[] sha = DigestUtils.sha(payload);
+        return new String(b64.encode(sha));
+    }
 
     protected String generateTimestamp() {
         return Long.toString(System.currentTimeMillis() / 1000L);
@@ -258,4 +293,18 @@ public abstract class AbstractOAuthConsumer implements OAuthConsumer {
     protected String generateNonce() {
         return Long.toString(new Random().nextLong());
     }
+
+    public void setShouldSignBody(boolean enabled) {
+        shouldSignBody = enabled;
+    }
+    
+    public String convertStreamToString(InputStream in) throws IOException {
+        StringBuffer out = new StringBuffer();
+        byte[] b = new byte[4096];
+        for (int n; (n = in.read(b)) != -1;) {
+            out.append(new String(b, 0, n));
+        }
+        return out.toString();
+    }
+
 }

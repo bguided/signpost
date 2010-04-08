@@ -1,6 +1,11 @@
 package oauth.signpost;
 
 import static org.mockito.Mockito.when;
+
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+
 import oauth.signpost.http.HttpRequest;
 import oauth.signpost.http.HttpParameters;
 
@@ -42,6 +47,9 @@ public abstract class SignpostTestBase {
 
     @Mock
     protected HttpRequest httpPostMock;
+    
+    @Mock
+    protected HttpRequest httpPutMock;
 
     @BeforeClass
     public static void initOAuthParams() {
@@ -54,7 +62,7 @@ public abstract class SignpostTestBase {
     }
 
     @Before
-    public void initRequestMocks() {
+    public void initRequestMocks() throws IOException {
         MockitoAnnotations.initMocks(this);
 
         when(httpGetMock.getMethod()).thenReturn("GET");
@@ -62,6 +70,13 @@ public abstract class SignpostTestBase {
 
         when(httpPostMock.getMethod()).thenReturn("POST");
         when(httpPostMock.getRequestUrl()).thenReturn("http://www.example.com");
+        
+        when(httpPutMock.getMethod()).thenReturn("PUT");
+        when(httpPutMock.getRequestUrl()).thenReturn("http://www.example.com/resource");
+        InputStream in = new ByteArrayInputStream("Hello World!".getBytes());
+        when(httpPutMock.getMessagePayload()).thenReturn(in);
+        when(httpPutMock.getContentType()).thenReturn("text/plain");
+        
     }
 
 }
