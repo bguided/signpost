@@ -12,6 +12,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package oauth.signpost;
 
 import java.io.BufferedInputStream;
@@ -63,7 +64,7 @@ public abstract class AbstractOAuthConsumer implements OAuthConsumer {
     private HttpParameters requestParameters;
 
     private boolean sendEmptyTokens;
-    
+
     private boolean shouldSignBody = false;
 
     public AbstractOAuthConsumer(String consumerKey, String consumerSecret) {
@@ -103,7 +104,7 @@ public abstract class AbstractOAuthConsumer implements OAuthConsumer {
             collectHeaderParameters(request, requestParameters);
             collectQueryParameters(request, requestParameters);
             collectBodyParameters(request, requestParameters);
-            
+
             if (shouldSignBody) {
                 collectBodyHashParameters(request, requestParameters);
             }
@@ -152,8 +153,7 @@ public abstract class AbstractOAuthConsumer implements OAuthConsumer {
      * Adapts the given request object to a Signpost {@link HttpRequest}. How
      * this is done depends on the consumer implementation.
      * 
-     * @param request
-     *        the native HTTP request instance
+     * @param request the native HTTP request instance
      * @return the adapted request
      */
     protected abstract HttpRequest wrap(Object request);
@@ -192,8 +192,7 @@ public abstract class AbstractOAuthConsumer implements OAuthConsumer {
      * {@link #generateNonce()} or {@link #generateTimestamp()} instead.
      * </p>
      * 
-     * @param out
-     *        the request parameter which should be completed
+     * @param out the request parameter which should be completed
      */
     protected void completeOAuthParameters(HttpParameters out) {
         if (!out.containsKey(OAuth.OAUTH_CONSUMER_KEY)) {
@@ -231,7 +230,8 @@ public abstract class AbstractOAuthConsumer implements OAuthConsumer {
      * section 9.1.1
      */
     protected void collectHeaderParameters(HttpRequest request, HttpParameters out) {
-        HttpParameters headerParams = OAuth.oauthHeaderToParamsMap(request.getHeader(OAuth.HTTP_AUTHORIZATION_HEADER));
+        HttpParameters headerParams = OAuth.oauthHeaderToParamsMap(request
+                .getHeader(OAuth.HTTP_AUTHORIZATION_HEADER));
         out.putAll(headerParams, true);
     }
 
@@ -263,19 +263,23 @@ public abstract class AbstractOAuthConsumer implements OAuthConsumer {
             out.putAll(OAuth.decodeForm(url.substring(q + 1)), true);
         }
     }
-    
-    protected void collectBodyHashParameters(HttpRequest request, HttpParameters out) 
-        throws IOException{
-        // The body hash parameter MUST NOT be sent on requests that use the application/x-www-form-urlencoded content-type. 
-        // The body hash parameter MUST NOT be sent on HTTP GET or HEAD requests. 
+
+    protected void collectBodyHashParameters(HttpRequest request, HttpParameters out)
+            throws IOException {
+        // The body hash parameter MUST NOT be sent on requests that use the
+        // application/x-www-form-urlencoded content-type.
+        // The body hash parameter MUST NOT be sent on HTTP GET or HEAD
+        // requests.
         // The body hash parameter SHOULD be sent on all other requests.
         String method = request.getMethod();
         String contentType = request.getContentType();
-        if (method.equals("GET") || method.equals("HEAD") || contentType.startsWith(OAuth.FORM_ENCODED)) {
+        if (method.equals("GET") || method.equals("HEAD")
+                || contentType.startsWith(OAuth.FORM_ENCODED)) {
             // do nothing
         } else {
             // add bodyhash
-            out.put(OAuth.OAUTH_BODY_HASH, getHashForBody(request.getMessagePayload()));
+            out.put(OAuth.OAUTH_BODY_HASH, OAuth.percentEncode(getHashForBody(request
+                    .getMessagePayload())));
         }
     }
 
@@ -297,7 +301,7 @@ public abstract class AbstractOAuthConsumer implements OAuthConsumer {
     public void setShouldSignBody(boolean enabled) {
         shouldSignBody = enabled;
     }
-    
+
     public String convertStreamToString(InputStream in) throws IOException {
         StringBuffer out = new StringBuffer();
         byte[] b = new byte[4096];
